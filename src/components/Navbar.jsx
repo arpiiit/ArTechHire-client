@@ -1,15 +1,17 @@
 import React from 'react'
 import {assets} from '../assets/assets'
 import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
     const {openSignIn} = useClerk();
     const {user} = useUser();
+
+    const navigate = useNavigate();
   return (
     <div className='shadow py-4 '>
       <div className='container px-4 2xl:px-20 mx-auto justify-between flex items-center'>
-        <h2 className='logo font-bold text-2xl cursor-pointer'>Ar<span className='text-purple-600'>TechHire</span></h2>
+        <h2 onClick={()=>navigate('/')} className='logo cursor-pointer font-bold text-2xl cursor-pointer'>Ar<span className='text-purple-600'>TechHire</span></h2>
         {
             user ? (
                 <div className='flex items-center gap-4 max-sm:text-xs'>
