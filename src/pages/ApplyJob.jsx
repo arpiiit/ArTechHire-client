@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import {useNavigate, useParams } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import Loading from '../components/Loading';
 import Navbar from '../components/Navbar';
@@ -7,26 +7,80 @@ import { assets } from '../assets/assets';
 import kconvert from 'k-convert'
 import moment from 'moment'
 import Footer from '../components/Footer';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import { useAuth } from '@clerk/clerk-react';
 
 
 const ApplyJob = () => {
   const { id } = useParams();
+  const {getToken} = useAuth();
+  const navigate = useNavigate();
   const [jobData, setJobData] = useState(null);
+  const [isAlreadyApplied, setIsAlreadyApplied] = useState(false);
 
-  const { jobs } = useContext(AppContext);
+  const { jobs, backendUrl, userData, userApplications, fetchUserApplications } = useContext(AppContext);
 
-  const fetchJob = () => {
-    const data=jobs.filter(job=>job._id==id)
-    if(data.length!==0){
-      setJobData(data[0])
-      console.log(data[0]);
+  const fetchJob =async () => {
+    try {
+      const {data} =await axios.get(`${backendUrl}/api/jobs/${id}`);
+      if (data.success) {
+        setJobData(data.job);
+      }
+      
+    } catch (error) {
+      toast.error(error.message);
     }
   }
-  useEffect(()=>{
-    if(jobs.length>0){
-      fetchJob()
+
+  const applyHandler=async()=>{
+    try {
+      if(!userData){
+        toast.error("Please login to apply for the job");
+        return;
+      }
+      if(!userData.resume){
+        navigate('/applications');
+        return toast.error("Please upload your resume before applying for the job");
+      }   
+      const token = await getToken();
+      const {data} = await axios.post(`${backendUrl}/api/users/apply`,
+        { jobId:id },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        } 
+      );
+      if (data.success) {
+        toast.success(data.message);
+        await fetchUserApplications();
+        navigate('/applications');
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+
     }
+  }
+
+  const checkIfAlreadyApplied = () => {
+    const hasApplied = userApplications.some(application => application.jobId._id === jobData._id);
+    setIsAlreadyApplied(hasApplied);
+  }
+
+  useEffect(()=>{
+ 
+      fetchJob()
+   
   },[id, jobs])
+
+  useEffect(() => {
+    if(userApplications.length > 0 && jobData) {
+      checkIfAlreadyApplied();
+    }
+  }, [jobData,userApplications, id]);
 
   return jobData ? (
     <>
@@ -60,7 +114,7 @@ const ApplyJob = () => {
             </div>
 
             <div className='flex flex-col juscent-center text-end text-sm max-md:mx-auto max-md:text-center'>
-              <button className='bg-purple-600 text-white px-4 sm:px-9 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-all duration-300'>Apply now</button>
+              <button onClick={applyHandler} className='bg-purple-600 text-white px-4 sm:px-9 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-all duration-300'>{isAlreadyApplied ? "Already applied" : "Apply now"}</button>
               <p className='text-gray-500 mt-1 '>Posted {moment(jobData.date).fromNow()}</p>
             </div>
           </div>
@@ -69,7 +123,7 @@ const ApplyJob = () => {
             <div className='w-full lg:w-2/3'>
               <h2 className='font-medium text-2xl mb-4'>Job Description</h2>
               <p className='text-gray-500 ' dangerouslySetInnerHTML={{__html: jobData.description}}></p>
-              <button className='bg-purple-600 mt-10 text-white px-4 sm:px-9 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-all duration-300'>Apply now</button>
+              <button onClick={applyHandler} className='bg-purple-600 mt-10 text-white px-4 sm:px-9 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-all duration-300'>{isAlreadyApplied ? "Already applied" : "Apply now"}</button>
             </div>
             {/* right section for more jobs */}
             <div className='w-full lg:w-1/4 mt-10 lg:mt-0 space-y-5 '>

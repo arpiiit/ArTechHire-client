@@ -1,24 +1,66 @@
-import React from "react";
+import React, { useContext, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import { useState } from "react";
 import { assets, jobsApplied } from "../assets/assets";
 import moment from "moment";
 import Footer from "../components/Footer";
+import { AppContext } from "../context/AppContext";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 const Applications = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [resume, setResume] = useState(null);
+  const {user} =useUser();
+  const {getToken} = useAuth();
+
+  const {backendUrl, userData, userApplications, fetchUserData, fetchUserApplications} = useContext(AppContext);
+
+  const updateResume = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("resume", resume);
+      const token = await getToken();
+      const {data}= await axios.post(`${backendUrl}/api/users/update-resume`, formData, {
+        headers: {
+         Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if(data.success) {
+        toast.success("Resume updated successfully!");
+       await fetchUserData();
+      }else{
+        toast.error("Failed to update resume. Please try again.");
+      }
+    } catch (error) {
+      
+      console.error("Error updating resume:", error);
+      toast.error("An error occurred while updating your resume.");
+    }
+
+    setIsEditing(false);
+    setResume(null);
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchUserApplications()
+    }
+  }, [user]);
+
   return (
     <>
       <Navbar />
       <div className="container px-4 min-h-[65vh] 2xl:px-20 mx-auto py-10">
         <h2 className="text-xl font-semibold">Your Resume</h2>
         <div className="flex gap-2 mb-6 mt-3">
-          {isEditing ? (
+          {isEditing || userData && userData.resume==="" ? (
             <>
               <label className="flex items-center" htmlFor="resumeUpload">
                 <p className="bg-purple-100 text-purple-600 cursor-pointer px-4 py-2 mr-2 rounded-md">
-                  Select Resume
+                  {resume ? resume.name : "Upload Resume"}
                 </p>
                 <input
                   id="resumeUpload"
@@ -30,7 +72,7 @@ const Applications = () => {
                 <img src={assets.profile_upload_icon} />
               </label>
               <button
-                onClick={(e) => setIsEditing(false)}
+                onClick={updateResume}
                 className="bg-green-100 cursor-pointer border border-green-400 px-4 py-2 rounded-md"
               >
                 Save
@@ -40,7 +82,8 @@ const Applications = () => {
             <div className="flex gap-2">
               <a
                 className="bg-purple-100 text-purple-600 cursor-pointer px-4 py-2 rounded-md"
-                href=""
+                href={userData.resume}
+                target="_blank"
               >
                 Resume
               </a>
@@ -75,18 +118,18 @@ const Applications = () => {
             </tr>
           </thead>
           <tbody>
-            {jobsApplied.map((job, index) =>
+            {userApplications.map((job, index) =>
               true ? (
-                <tr>
+                <tr key={index}>
                   <td className="py-3 px-4 border-b bg-white text-black border border-gray-200 flex items-center gap-2">
-                    <img className="h-8 w-8" src={job.logo} />
-                    {job.company}
+                    <img className="h-8 w-8" src={job.companyId.image} />
+                    {job.companyId.name}
                   </td>
                   <td className="py-3 px-4 border-b bg-white text-black border border-gray-200">
-                    {job.title}
+                    {job.jobId.title}
                   </td>
                   <td className="py-3 px-4 border-b bg-white text-black border border-gray-200 max-sm:hidden">
-                    {job.location}
+                    {job.jobId.location}
                   </td>
                   <td className="py-3 px-4 border-b bg-white text-black border border-gray-200 max-sm:hidden">
                     {moment(job.date).format("DD-MM-YYYY")}
